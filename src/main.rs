@@ -11,7 +11,10 @@ async fn main() {
     let mut reader = BufReader::new(reader);
     let mut line = String::new();
     loop {
-        let _bytes_read: usize = reader.read_line(&mut line).await.unwrap();
+        let bytes_read: usize = reader.read_line(&mut line).await.unwrap();
+        if bytes_read == 0 {
+            break;
+        }
         writer.write_all(line.as_bytes()).await.unwrap();
     }
 }
