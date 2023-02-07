@@ -5,6 +5,7 @@ use tokio::{
 
 #[tokio::main]
 async fn main() {
+    // For all this code we don't need Tokio. This is all sync, and in one thread.
     let listener: TcpListener = TcpListener::bind("localhost:8080").await.unwrap();
     let (mut socket, _addr) = listener.accept().await.unwrap();
     let (reader, mut writer) = socket.split();
