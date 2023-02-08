@@ -8,7 +8,7 @@ use tokio::{
 async fn main() {
     let listener: TcpListener = TcpListener::bind("localhost:8080").await.unwrap();
 
-    let (tx, rx) = broadcast::channel::<String>(10);
+    let (tx, _rx) = broadcast::channel::<String>(10);
 
     loop {
         let (mut socket, _addr) = listener.accept().await.unwrap();
@@ -21,16 +21,16 @@ async fn main() {
             let mut line = String::new();
 
             loop {
-                let bytes_read: usize = reader.read_line(&mut line).await.unwrap();
-                if bytes_read == 0 {
-                    break;
+                tokio::select! {
+                    _ = reader.read_line(&mut line) => {
+                        tx.send(line.clone()).unwrap();
+                        line.clear();
+                    }
+                    result = rx.recv() => {
+                        let msg = result.unwrap();
+                        writer.write_all(msg.as_bytes()).await.unwrap();
+                    }
                 }
-                tx.send(line.clone()).unwrap();
-
-                let msg = rx.recv().await.unwrap();
-
-                writer.write_all(msg.as_bytes()).await.unwrap();
-                line.clear();
             }
         });
     }
