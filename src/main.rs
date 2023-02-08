@@ -1,22 +1,37 @@
 use tokio::{
     io::{AsyncBufReadExt, AsyncWriteExt, BufReader},
     net::TcpListener,
+    sync::broadcast,
 };
 
 #[tokio::main]
 async fn main() {
-    // For all this code we don't need Tokio. This is all sync, and in one thread.
     let listener: TcpListener = TcpListener::bind("localhost:8080").await.unwrap();
-    let (mut socket, _addr) = listener.accept().await.unwrap();
-    let (reader, mut writer) = socket.split();
-    let mut reader = BufReader::new(reader);
-    let mut line = String::new();
+
+    let (tx, rx) = broadcast::channel::<String>(10);
+
     loop {
-        let bytes_read: usize = reader.read_line(&mut line).await.unwrap();
-        if bytes_read == 0 {
-            break;
-        }
-        writer.write_all(line.as_bytes()).await.unwrap();
-        line.clear();
+        let (mut socket, _addr) = listener.accept().await.unwrap();
+        let tx = tx.clone();
+        let mut rx = tx.subscribe();
+
+        tokio::spawn(async move {
+            let (reader, mut writer) = socket.split();
+            let mut reader = BufReader::new(reader);
+            let mut line = String::new();
+
+            loop {
+                let bytes_read: usize = reader.read_line(&mut line).await.unwrap();
+                if bytes_read == 0 {
+                    break;
+                }
+                tx.send(line.clone()).unwrap();
+
+                let msg = rx.recv().await.unwrap();
+
+                writer.write_all(msg.as_bytes()).await.unwrap();
+                line.clear();
+            }
+        });
     }
 }
